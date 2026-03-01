@@ -1,31 +1,16 @@
-from flask_wtf import FlaskForm
-from wtforms import (
-    StringField,
-    PasswordField,
-    BooleanField,
-    SubmitField,
-    FieldList,
-    FormField,
-    DecimalField,
-    SelectField,
-    HiddenField,
-)
-from wtforms.validators import (
-    ValidationError,
-    DataRequired,
-    Email,
-    EqualTo,
-    Length,
-    Regexp,
-    InputRequired,
-    NumberRange,
-)
-from flask_wtf.file import FileField, FileRequired, FileAllowed
-from decimal import Decimal, InvalidOperation
+# ruff: disable[ERA001]
+
+from decimal import Decimal
+
 import sqlalchemy as sa
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField, FileRequired
+from wtforms import BooleanField, DecimalField, FieldList, FormField, HiddenField, PasswordField, SelectField, StringField, SubmitField
+from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Regexp, ValidationError
+
 from app import db
-from app.models import User
 from app.constants import TRANSPORT_TYPE_CHOICES
+from app.models import User
 
 
 class LoginForm(FlaskForm):
@@ -39,9 +24,7 @@ class RegistrationForm(FlaskForm):
     username = StringField("Логин", validators=[DataRequired()])
     email = StringField("Email", validators=[DataRequired(), Email()])
     password = PasswordField("Пароль", validators=[DataRequired()])
-    password2 = PasswordField(
-        "Повтор пароля", validators=[DataRequired(), EqualTo("password")]
-    )
+    password2 = PasswordField("Повтор пароля", validators=[DataRequired(), EqualTo("password")])
     submit = SubmitField("Зарегистрироваться")
 
     def validate_username(self, username):
@@ -58,9 +41,7 @@ class RegistrationForm(FlaskForm):
 # --- Подформа для ввода одной Тарифной Таблицы (Строка Tabs) ---
 class TariffTableEntryForm(FlaskForm):
     # 1. Название тарифа (для Шага 3 и отображения)
-    tariff_name = StringField(
-        "Название тарифа", validators=[DataRequired(), Length(max=50)]
-    )
+    tariff_name = StringField("Название тарифа", validators=[DataRequired(), Length(max=50)])
 
     # 2. Тип таблицы (Стартовый код)
     # 02 для первой таблицы, P/T/F для остальных.
@@ -98,9 +79,7 @@ class StopForm(FlaskForm):
         # Это отключает CSRF именно для этой подформы
         csrf = False
 
-    stop_name = StringField(
-        "Название остановки", validators=[DataRequired(), Length(max=19)]
-    )
+    stop_name = StringField("Название остановки", validators=[DataRequired(), Length(max=19)])
     # Добавим расстояние, необходимое для генерации файла конфигурации
     # km_distance = DecimalField('Расстояние (км от начальной точки)', places=2, validators=[DataRequired()], default=0.00)
 
@@ -125,14 +104,12 @@ class StopForm(FlaskForm):
             return
 
         # 2. Проверка, что Decimal имеет ровно два знака после запятой (places=2 уже помогает, но не гарантирует)
-        if value.as_tuple().exponent != -2:
+        if value.as_tuple().exponent != -2:  # noqa: SIM102
             # Принудительно округляем до 2 знаков, если DecimalField не справился,
             # и сравниваем с исходным значением.
             # Например: 5.40001 округлится до 5.40. Если они не равны, то ошибка.
             if value != value.quantize(Decimal("0.00")):
-                raise ValidationError(
-                    "Расстояние должно иметь не более двух знаков после запятой (Формат 99.99)."
-                )
+                raise ValidationError("Расстояние должно иметь не более двух знаков после запятой (Формат 99.99).")
 
         # 3. Проверка на максимальное значение (99.99)
         if value > Decimal("99.99"):
@@ -175,9 +152,7 @@ class RouteInfoForm(FlaskForm):
         validators=[DataRequired()],
     )
 
-    route_name = StringField(
-        "Название маршрута", validators=[DataRequired(), Length(max=30)]
-    )
+    route_name = StringField("Название маршрута", validators=[DataRequired(), Length(max=30)])
 
     route_number = StringField(
         "Номер маршрута (напр., 854)",
@@ -225,11 +200,7 @@ class RouteInfoForm(FlaskForm):
             form_data = entry.form
 
             # Парсим строку серий SS
-            ss_codes = [
-                c.strip()
-                for c in form_data.ss_series_codes.data.split(";")
-                if c.strip()
-            ]
+            ss_codes = [c.strip() for c in form_data.ss_series_codes.data.split(";") if c.strip()]
 
             # 1. Правила для Таблицы 1 (i == 0)
             if i == 0:
@@ -238,16 +209,12 @@ class RouteInfoForm(FlaskForm):
 
                 # Проверяем, что список серий SS не пуст, т.к. "02" уже был в TableTypeCode
                 if not ss_codes:
-                    raise ValidationError(
-                        'Таблица 1 должна содержать серии SS после "02".'
-                    )
+                    raise ValidationError('Таблица 1 должна содержать серии SS после "02".')
 
             # 2. Правила для Таблиц > 1 (i > 0)
             else:
                 if form_data.table_type_code.data not in ["P", "T", "F"]:
-                    raise ValidationError(
-                        f'Таблица {i + 1} должна иметь тип "P", "T" или "F".'
-                    )
+                    raise ValidationError(f'Таблица {i + 1} должна иметь тип "P", "T" или "F".')
 
             # 3. Проверка уникальности серий SS
             # Важно: В спецификации код '02' идет ПЕРВЫМ значением SS в первой строке.
@@ -258,10 +225,7 @@ class RouteInfoForm(FlaskForm):
             for code in ss_codes:
                 if code in all_ss_codes:
                     # Указываем, что конфликт возник в таблице i+1
-                    raise ValidationError(
-                        f'Серия SS "{code}" в Таблице {i + 1} уже присутствует в другой таблице. '
-                        "Один номер серии может быть только в одной строке блока Tabs."
-                    )
+                    raise ValidationError(f'Серия SS "{code}" в Таблице {i + 1} уже присутствует в другой таблице. Один номер серии может быть только в одной строке блока Tabs.')
                 all_ss_codes.add(code)
 
             # 4. Дополнительная проверка: Если код = 02, его не должно быть в других таблицах
@@ -295,23 +259,15 @@ class RouteStopsForm(FlaskForm):
         is_city_route = self.route and self.route.transport_type == "0x02"
 
         if not is_city_route and len(field.entries) < 2:
-            route_transport_type = TRANSPORT_TYPE_CHOICES.get(
-                self.route.transport_type, self.route.transport_type
-            )
-            raise ValidationError(
-                f"Маршрут с типом транспортного средства {route_transport_type} должен содержать минимум 2 остановки (начальную и конечную)."
-            )
+            route_transport_type = TRANSPORT_TYPE_CHOICES.get(self.route.transport_type, self.route.transport_type)
+            raise ValidationError(f"Маршрут с типом транспортного средства {route_transport_type} должен содержать минимум 2 остановки (начальную и конечную).")
 
         # Если маршрут городской (0x02), и остановок больше 1, это ошибка,
         # но мы контролируем это на фронтенде и JS. На всякий случай:
         if is_city_route and len(field.entries) > 1:
-            raise ValidationError(
-                "Городской маршрут может содержать только одну зону (Остановка 0)."
-            )
+            raise ValidationError("Городской маршрут может содержать только одну зону (Остановка 0).")
 
-        previous_km = Decimal(
-            "-1.0"
-        )  # Начинаем с отрицательного числа для первой проверки
+        previous_km = Decimal("-1.0")  # Начинаем с отрицательного числа для первой проверки
 
         for i, entry in enumerate(field.entries):
             # entry.form - это экземпляр StopForm, entry.data - словарь данных
@@ -325,16 +281,11 @@ class RouteStopsForm(FlaskForm):
 
             # На всякий случай проверяем на None, хотя InputRequired должен предотвратить это
             if current_km_decimal is None:
-                raise ValidationError(
-                    f"Ошибка: Расстояние до остановки №{i} не заполнено."
-                )
+                raise ValidationError(f"Ошибка: Расстояние до остановки №{i} не заполнено.")
 
             # 2. Валидация для первой остановки (index == 0)
-            if i == 0:
-                if current_km_decimal != Decimal("0.00"):
-                    raise ValidationError(
-                        "Расстояние до начальной остановки (Остановка 0) должно быть 0.00 км."
-                    )
+            if i == 0 and current_km_decimal != Decimal("0.00"):
+                raise ValidationError("Расстояние до начальной остановки (Остановка 0) должно быть 0.00 км.")
 
             # 3. Валидация для всех остальных остановок (index > 0)
             if i > 0 and current_km_decimal <= previous_km:
@@ -345,10 +296,7 @@ class RouteStopsForm(FlaskForm):
                 prev_km_str = f"{previous_km:.2f}"
                 curr_km_str = f"{current_km_decimal:.2f}"
 
-                raise ValidationError(
-                    f'Расстояние до остановки "{stop_name}" ({curr_km_str} км) должно быть '
-                    f"строго больше ({prev_km_str} км) предыдущей остановки."
-                )
+                raise ValidationError(f'Расстояние до остановки "{stop_name}" ({curr_km_str} км) должно быть строго больше ({prev_km_str} км) предыдущей остановки.')
 
             # Обновляем предыдущее расстояние
             previous_km = current_km_decimal

@@ -1,6 +1,5 @@
-import pytest
 from app import db
-from app.models import User, Route
+from app.models import Route
 
 
 def test_index_redirects_to_login_when_not_logged_in(client):
@@ -32,9 +31,7 @@ def test_login_success(client, test_user):
 
 
 def test_login_failure(client):
-    response = client.post(
-        "/login", data={"username": "wrong", "password": "wrong"}, follow_redirects=True
-    )
+    response = client.post("/login", data={"username": "wrong", "password": "wrong"}, follow_redirects=True)
     assert response.status_code == 200
     assert "Неверный логин или пароль" in response.get_data(as_text=True)
 
@@ -88,18 +85,13 @@ def test_edit_profile(logged_in_client):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert (
-        "Настройки профиля для массовой генерации успешно сохранены"
-        in response.get_data(as_text=True)
-    )
+    assert "Настройки профиля для массовой генерации успешно сохранены" in response.get_data(as_text=True)
 
 
 def test_route_list(logged_in_client):
     response = logged_in_client.get("/routes")
     assert response.status_code == 200
-    assert "routes" in response.get_data(
-        as_text=True
-    ) or "Маршруты" in response.get_data(as_text=True)  # Assuming template has this
+    assert "routes" in response.get_data(as_text=True) or "Маршруты" in response.get_data(as_text=True)  # Assuming template has this
 
 
 def test_create_route_info_get(logged_in_client):
@@ -273,6 +265,4 @@ def test_generate_bulk_config(logged_in_client):
 def test_import_route_get(logged_in_client):
     response = logged_in_client.get("/route/import")
     assert response.status_code == 200
-    assert "Импорт маршрута" in response.get_data(
-        as_text=True
-    )  # Assuming template has this
+    assert "Импорт маршрута" in response.get_data(as_text=True)  # Assuming template has this

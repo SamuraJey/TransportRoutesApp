@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, flash, redirect, url_for
+from flask import Blueprint, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
-from app.forms import EditProfileForm
+
 from app import db
+from app.forms import EditProfileForm
 
 bp = Blueprint("profile", __name__)
 
@@ -55,9 +56,7 @@ def edit_profile():
 
         db.session.commit()
         flash("Настройки профиля для массовой генерации успешно сохранены.", "success")
-        return redirect(
-            url_for("profile.edit_profile")
-        )  # Перенаправляем обратно на ту же страницу
+        return redirect(url_for("profile.edit_profile"))  # Перенаправляем обратно на ту же страницу
 
     # GET-запрос или ошибка валидации
     return render_template(

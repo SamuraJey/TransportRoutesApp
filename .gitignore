@@ -34,3 +34,4 @@ Thumbs.db
 # Миграции (если не хотите коммитить их)
 migrations/versions/*
 !migrations/versions/.keep
+.coverage

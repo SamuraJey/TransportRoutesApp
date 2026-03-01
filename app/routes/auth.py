@@ -1,10 +1,12 @@
-from flask import Blueprint, render_template, flash, redirect, url_for, request
-from flask_login import current_user, login_user, logout_user, login_required
-from app.models import User
-from app.forms import LoginForm, RegistrationForm
 from urllib.parse import urlsplit
+
 import sqlalchemy as sa
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+
 from app import db
+from app.forms import LoginForm, RegistrationForm
+from app.models import User
 
 bp = Blueprint("auth", __name__)
 
@@ -22,9 +24,7 @@ def login():
         return redirect(url_for("auth.index"))
     form = LoginForm()
     if form.validate_on_submit():
-        user = db.session.scalar(
-            sa.select(User).where(User.username == form.username.data)
-        )
+        user = db.session.scalar(sa.select(User).where(User.username == form.username.data))
         if user is None or not user.check_password(form.password.data):
             flash("Неверный логин или пароль", "danger")
             return redirect(url_for("auth.login"))
