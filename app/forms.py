@@ -199,6 +199,10 @@ class RouteInfoForm(FlaskForm):
         for i, entry in enumerate(field.entries):
             form_data = entry.form
 
+            # Проверяем, что данные существуют
+            if not form_data.ss_series_codes.data:
+                continue  # Пропускаем пустые записи
+
             # Парсим строку серий SS
             ss_codes = [c.strip() for c in form_data.ss_series_codes.data.split(";") if c.strip()]
 
