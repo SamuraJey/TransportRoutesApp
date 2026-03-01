@@ -1,10 +1,13 @@
 # ruff: disable[ERA001]
 
+import re
 from decimal import Decimal
 
 import sqlalchemy as sa
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
+from pydantic import BaseModel, Field, field_validator
+from pydantic import ValidationError as PydanticValidationError
 from wtforms import BooleanField, DecimalField, FieldList, FormField, HiddenField, PasswordField, SelectField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Regexp, ValidationError
 
@@ -19,6 +22,28 @@ class LoginForm(FlaskForm):
     remember_me = BooleanField("Запомнить меня")
     submit = SubmitField("Войти")
 
+    def validate(self, extra_validators=None):
+        """Override validate to use Pydantic validation."""
+        # First run WTForms validation for CSRF and basic field validation
+        if not super().validate(extra_validators=extra_validators):
+            return False
+
+        # Now validate with Pydantic
+        try:
+            login_data = {
+                "username": self.username.data,
+                "password": self.password.data,
+                "remember_me": self.remember_me.data or False,
+            }
+            LoginModel(**login_data)
+            return True
+        except PydanticValidationError as e:
+            for error in e.errors():
+                field_name = error["loc"][0]
+                if hasattr(self, field_name):
+                    getattr(self, field_name).errors.append(error["msg"])
+            return False
+
 
 class RegistrationForm(FlaskForm):
     username = StringField("Логин", validators=[DataRequired()])
@@ -26,6 +51,29 @@ class RegistrationForm(FlaskForm):
     password = PasswordField("Пароль", validators=[DataRequired()])
     password2 = PasswordField("Повтор пароля", validators=[DataRequired(), EqualTo("password")])
     submit = SubmitField("Зарегистрироваться")
+
+    def validate(self, extra_validators=None):
+        """Override validate to use Pydantic validation."""
+        # First run WTForms validation for CSRF
+        if not super().validate(extra_validators=extra_validators):
+            return False
+
+        # Now validate with Pydantic
+        try:
+            reg_data = {
+                "username": self.username.data,
+                "email": self.email.data,
+                "password": self.password.data,
+                "password2": self.password2.data,
+            }
+            RegistrationModel(**reg_data)
+            return True
+        except PydanticValidationError as e:
+            for error in e.errors():
+                field_name = error["loc"][0]
+                if hasattr(self, field_name):
+                    getattr(self, field_name).errors.append(error["msg"])
+            return False
 
     def validate_username(self, username):
         user = db.session.scalar(sa.select(User).where(User.username == username.data))
@@ -72,6 +120,26 @@ class TariffTableEntryForm(FlaskForm):
         ],
     )
 
+    def validate(self, extra_validators=None):
+        """Override validate to use Pydantic validation."""
+        if not super().validate(extra_validators=extra_validators):
+            return False
+
+        try:
+            tariff_data = {
+                "tariff_name": self.tariff_name.data,
+                "table_type_code": self.table_type_code.data,
+                "ss_series_codes": self.ss_series_codes.data,
+            }
+            TariffTableEntryModel(**tariff_data)
+            return True
+        except PydanticValidationError as e:
+            for error in e.errors():
+                field_name = error["loc"][0]
+                if hasattr(self, field_name):
+                    getattr(self, field_name).errors.append(error["msg"])
+            return False
+
 
 # --- Подформа для ввода одной остановки ---
 class StopForm(FlaskForm):
@@ -93,6 +161,25 @@ class StopForm(FlaskForm):
             NumberRange(min=0, message="Расстояние не может быть отрицательным."),
         ],
     )
+
+    def validate(self, extra_validators=None):
+        """Override validate to use Pydantic validation."""
+        if not super().validate(extra_validators=extra_validators):
+            return False
+
+        try:
+            stop_data = {
+                "stop_name": self.stop_name.data,
+                "km_distance": self.km_distance.data,
+            }
+            StopModel(**stop_data)
+            return True
+        except PydanticValidationError as e:
+            for error in e.errors():
+                field_name = error["loc"][0]
+                if hasattr(self, field_name):
+                    getattr(self, field_name).errors.append(error["msg"])
+            return False
 
     def validate_km_distance(self, field):
         """Проверяет формат числа на соответствие спецификации 99.99."""
@@ -170,17 +257,6 @@ class RouteInfoForm(FlaskForm):
         validators=[DataRequired()],
     )
 
-    # transport_type = SelectField('Тип транспорта', choices=[
-    #     ('0x01', 'Метрополитен (01)'),
-    #     ('0x02', 'Автобус (городской) (02)'), # Используется 02 в файле
-    #     ('0x20', 'Автобус (пригородный) (20)'),
-    #     ('0x40', 'Автобус (междугородний) (40)'),
-    #     ('0x04', 'Троллейбус (04)'),
-    #     ('0x08', 'Трамвай (08)'),
-    #     ('0x10', 'Маршрутное такси (10)'),
-    #     ('0x80', 'Поезд (пригородный) (80)'),
-    # ], validators=[DataRequired()])
-
     # Тарифные таблицы (FieldList)
     tariff_tables = FieldList(
         FormField(TariffTableEntryForm),
@@ -191,49 +267,62 @@ class RouteInfoForm(FlaskForm):
 
     next_step = SubmitField("Сохранить и перейти к списку остановок")
 
-    def validate_tariff_tables(self, field):
-        """Проверяет соблюдение правил спецификации для тарифных таблиц (Tabs)."""
+    def validate(self, extra_validators=None):
+        """Override validate to use Pydantic validation."""
+        # First run WTForms validation for CSRF and basic field validation
+        if not super().validate(extra_validators=extra_validators):
+            return False
 
-        all_ss_codes = set()
+        # Now validate with Pydantic
+        try:
+            # Convert form data to Pydantic model
+            tariff_tables_data = [
+                {
+                    "tariff_name": entry.form.tariff_name.data or "",
+                    "table_type_code": entry.form.table_type_code.data or "",
+                    "ss_series_codes": entry.form.ss_series_codes.data or "",
+                }
+                for entry in self.tariff_tables.entries
+                if entry.form.tariff_name.data or entry.form.table_type_code.data or entry.form.ss_series_codes.data
+            ]
 
-        for i, entry in enumerate(field.entries):
-            form_data = entry.form
+            route_data = {
+                "region_code": self.region_code.data,
+                "carrier_id": self.carrier_id.data,
+                "unit_id": self.unit_id.data,
+                "decimal_places": self.decimal_places.data,
+                "route_name": self.route_name.data,
+                "route_number": self.route_number.data,
+                "transport_type": self.transport_type.data,
+                "tariff_tables": tariff_tables_data,
+            }
 
-            # Проверяем, что данные существуют
-            if not form_data.ss_series_codes.data:
-                continue  # Пропускаем пустые записи
+            # Validate with Pydantic
+            RouteInfoModel(**route_data)
+            return True
 
-            # Парсим строку серий SS
-            ss_codes = [c.strip() for c in form_data.ss_series_codes.data.split(";") if c.strip()]
-
-            # 1. Правила для Таблицы 1 (i == 0)
-            if i == 0:
-                if form_data.table_type_code.data != "02":
-                    raise ValidationError('Таблица 1 должна начинаться с кода "02".')
-
-                # Проверяем, что список серий SS не пуст, т.к. "02" уже был в TableTypeCode
-                if not ss_codes:
-                    raise ValidationError('Таблица 1 должна содержать серии SS после "02".')
-
-            # 2. Правила для Таблиц > 1 (i > 0)
-            else:
-                if form_data.table_type_code.data not in ["P", "T", "F"]:
-                    raise ValidationError(f'Таблица {i + 1} должна иметь тип "P", "T" или "F".')
-
-            # 3. Проверка уникальности серий SS
-            # Важно: В спецификации код '02' идет ПЕРВЫМ значением SS в первой строке.
-            # Если мы используем его как table_type_code, мы не должны проверять его здесь.
-            # Но если table_type_code это P/T/F, то P/T/F не входит в ss_codes.
-
-            # Мы собираем коды SS из полей "ss_series_codes" для всех таблиц:
-            for code in ss_codes:
-                if code in all_ss_codes:
-                    # Указываем, что конфликт возник в таблице i+1
-                    raise ValidationError(f'Серия SS "{code}" в Таблице {i + 1} уже присутствует в другой таблице. Один номер серии может быть только в одной строке блока Tabs.')
-                all_ss_codes.add(code)
-
-            # 4. Дополнительная проверка: Если код = 02, его не должно быть в других таблицах
-            # Этот код не нужен, если мы уже проверили уникальность всех ss_codes.
+        except PydanticValidationError as e:
+            # Map Pydantic errors back to WTForms
+            for error in e.errors():
+                field_path = error["loc"]
+                if len(field_path) == 1:
+                    # Top-level field
+                    field_name = field_path[0]
+                    if hasattr(self, field_name):
+                        getattr(self, field_name).errors.append(error["msg"])
+                elif len(field_path) >= 2 and field_path[0] == "tariff_tables":
+                    # Tariff table error
+                    table_index = field_path[1]
+                    if len(field_path) >= 3:
+                        subfield = field_path[2]
+                        if table_index < len(self.tariff_tables.entries):
+                            entry = self.tariff_tables.entries[table_index]
+                            if hasattr(entry.form, subfield):
+                                getattr(entry.form, subfield).errors.append(error["msg"])
+                    else:
+                        # General tariff table error
+                        self.tariff_tables.errors.append(error["msg"])
+            return False
 
 
 # 2. Форма для управления Остановками (Отрезками) (Шаг 2)
@@ -252,6 +341,54 @@ class RouteStopsForm(FlaskForm):
     def __init__(self, *args, route=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.route = route  # Сохраняем объект маршрута
+
+    def validate(self, extra_validators=None):
+        """Override validate to use Pydantic validation."""
+        # First run WTForms validation for CSRF and basic field validation
+        if not super().validate(extra_validators=extra_validators):
+            return False
+
+        # Now validate with Pydantic
+        try:
+            # Convert form data to Pydantic model
+            stops_data = [
+                {
+                    "stop_name": entry.form.stop_name.data or "",
+                    "km_distance": entry.form.km_distance.data or Decimal("0.00"),
+                }
+                for entry in self.stops.entries
+                if entry.form.stop_name.data or entry.form.km_distance.data is not None
+            ]
+
+            route_data = {
+                "stops": stops_data,
+                "transport_type": self.route.transport_type if self.route else "0x02",
+            }
+
+            # Validate with Pydantic
+            RouteStopsModel(**route_data)
+            return True
+
+        except PydanticValidationError as e:
+            # Map Pydantic errors back to WTForms
+            for error in e.errors():
+                field_path = error["loc"]
+                if len(field_path) >= 2 and field_path[0] == "stops":
+                    # Stop error
+                    stop_index = field_path[1]
+                    if len(field_path) >= 3:
+                        subfield = field_path[2]
+                        if stop_index < len(self.stops.entries):
+                            entry = self.stops.entries[stop_index]
+                            if hasattr(entry.form, subfield):
+                                getattr(entry.form, subfield).errors.append(error["msg"])
+                    else:
+                        # General stop error
+                        self.stops.errors.append(error["msg"])
+                else:
+                    # General form error
+                    self.errors["general"] = self.errors.get("general", []) + [error["msg"]]
+            return False
 
     def validate_stops(self, field):
         """Проверяет, что расстояние в километрах (km_distance) строго возрастает
@@ -412,3 +549,241 @@ class ImportRouteForm(FlaskForm):
         ],
     )
     submit = SubmitField("Загрузить и импортировать")
+
+
+# ===== PYDANTIC MODELS FOR FLASK-PYDANTIC MIGRATION =====
+
+
+class LoginModel(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    remember_me: bool = False
+
+
+class RegistrationModel(BaseModel):
+    username: str = Field(..., min_length=1)
+    email: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    password2: str = Field(..., min_length=1)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v):
+        # Basic email validation - pydantic handles most of this
+        if "@" not in v:
+            raise ValueError("Некорректный email адрес")
+        return v
+
+    @field_validator("password2")
+    @classmethod
+    def validate_passwords_match(cls, v, info):
+        if "password" in info.data and v != info.data["password"]:
+            raise ValueError("Пароли не совпадают")
+        return v
+
+    @field_validator("username")
+    @classmethod
+    def validate_username_unique(cls, v):
+        user = db.session.scalar(sa.select(User).where(User.username == v))
+        if user is not None:
+            raise ValueError("Это имя уже занято.")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_unique(cls, v):
+        user = db.session.scalar(sa.select(User).where(User.email == v))
+        if user is not None:
+            raise ValueError("Этот email адрес уже занят.")
+        return v
+
+
+class TariffTableEntryModel(BaseModel):
+    tariff_name: str = Field(..., min_length=1, max_length=50)
+    table_type_code: str = Field(..., pattern=r"^(02|[PTF])$")
+    ss_series_codes: str = Field(..., pattern=r"^(\d{2}|[A-Z])(;(\d{2}|[A-Z]))*$")
+
+    @field_validator("table_type_code")
+    @classmethod
+    def validate_table_type_code(cls, v):
+        if v not in ["02", "P", "T", "F"]:
+            raise ValueError('Допускается только "02" (для первой таблицы), "P", "T" или "F".')
+        return v
+
+    @field_validator("ss_series_codes")
+    @classmethod
+    def validate_ss_series_codes(cls, v):
+        if not v.strip():
+            raise ValueError('Введите коды серий SS без пробелов через ";". Каждая серия должна быть 2-значным числом (или буквенным кодом).')
+
+        pattern = r"^(\d{2}|[A-Z])(;(\d{2}|[A-Z]))*$"
+        if not re.match(pattern, v):
+            raise ValueError('Введите коды серий SS без пробелов через ";". Каждая серия должна быть 2-значным числом (или буквенным кодом).')
+        return v
+
+
+class StopModel(BaseModel):
+    stop_name: str = Field(..., min_length=1, max_length=19)
+    km_distance: Decimal = Field(..., ge=0, le=Decimal("99.99"))
+
+    @field_validator("km_distance")
+    @classmethod
+    def validate_km_distance_format(cls, v: Decimal):
+        # Check that it has exactly 2 decimal places
+        if v.as_tuple().exponent != -2 and v != v.quantize(Decimal("0.00")):
+            raise ValueError("Расстояние должно иметь не более двух знаков после запятой (Формат 99.99).")
+        return v
+
+
+class RouteInfoModel(BaseModel):
+    region_code: str = Field(..., pattern=r"^\d{1,2}$")
+    carrier_id: str = Field(..., pattern=r"^\d{1,4}$")
+    unit_id: str = Field(..., pattern=r"^\d{1,4}$")
+    decimal_places: str = Field(..., pattern=r"^[012]$")
+    route_name: str = Field(..., min_length=1, max_length=30)
+    route_number: str = Field(..., min_length=1, max_length=6)
+    transport_type: str
+    tariff_tables: list[TariffTableEntryModel] = Field(..., min_length=1, max_length=15)
+
+    @field_validator("region_code")
+    @classmethod
+    def format_region_code(cls, v):
+        return v.zfill(2)
+
+    @field_validator("carrier_id")
+    @classmethod
+    def format_carrier_id(cls, v):
+        return v.zfill(4)
+
+    @field_validator("unit_id")
+    @classmethod
+    def format_unit_id(cls, v):
+        return v.zfill(4)
+
+    @field_validator("route_number")
+    @classmethod
+    def format_route_number(cls, v):
+        return v.zfill(6)
+
+    @field_validator("transport_type")
+    @classmethod
+    def validate_transport_type(cls, v):
+        if v not in TRANSPORT_TYPE_CHOICES:
+            raise ValueError("Некорректный тип транспорта")
+        return v
+
+    @field_validator("tariff_tables")
+    @classmethod
+    def validate_tariff_tables_rules(cls, v):
+        """Проверяет соблюдение правил спецификации для тарифных таблиц (Tabs)."""
+        if not v:
+            raise ValueError("Требуется хотя бы одна тарифная таблица")
+
+        all_ss_codes = set()
+
+        for i, entry in enumerate(v):
+            # 1. Правила для Таблицы 1 (i == 0)
+            if i == 0:
+                if entry.table_type_code != "02":
+                    raise ValueError('Таблица 1 должна начинаться с кода "02".')
+
+                # Проверяем, что список серий SS не пуст
+                ss_codes = [c.strip() for c in entry.ss_series_codes.split(";") if c.strip()]
+                if not ss_codes:
+                    raise ValueError('Таблица 1 должна содержать серии SS после "02".')
+
+            # 2. Правила для Таблиц > 1 (i > 0)
+            else:
+                if entry.table_type_code not in ["P", "T", "F"]:
+                    raise ValueError(f'Таблица {i + 1} должна иметь тип "P", "T" или "F".')
+
+            # 3. Проверка уникальности серий SS
+            ss_codes = [c.strip() for c in entry.ss_series_codes.split(";") if c.strip()]
+            for code in ss_codes:
+                if code in all_ss_codes:
+                    raise ValueError(f'Серия SS "{code}" в Таблице {i + 1} уже присутствует в другой таблице.')
+                all_ss_codes.add(code)
+
+        return v
+
+
+class RouteStopsModel(BaseModel):
+    stops: list[StopModel] = Field(..., min_length=1)
+    transport_type: str  # Need this for validation
+
+    @field_validator("stops")
+    @classmethod
+    def validate_stops_distances(cls, v, info):
+        """Проверяет, что расстояние в километрах строго возрастает."""
+        transport_type = info.data.get("transport_type", "0x02")
+        is_city_route = transport_type == "0x02"
+
+        if not is_city_route and len(v) < 2:
+            raise ValueError("Маршрут должен содержать минимум 2 остановки (начальную и конечную).")
+
+        if is_city_route and len(v) > 1:
+            raise ValueError("Городской маршрут может содержать только одну зону (Остановка 0).")
+
+        previous_km = Decimal("-1.0")
+
+        for i, stop in enumerate(v):
+            current_km = stop.km_distance
+
+            # First stop must be 0.00
+            if i == 0 and current_km != Decimal("0.00"):
+                raise ValueError("Расстояние до начальной остановки (Остановка 0) должно быть 0.00 км.")
+
+            # Other stops must have increasing distances
+            if i > 0 and current_km <= previous_km:
+                raise ValueError(f'Расстояние до остановки "{stop.stop_name}" ({current_km:.2f} км) должно быть строго больше ({previous_km:.2f} км) предыдущей остановки.')
+
+            previous_km = current_km
+
+        return v
+
+
+class RoutePricesModel(BaseModel):
+    price_matrix_data: str  # JSON string for now
+
+
+class BulkGenerateModel(BaseModel):
+    region_code: str = Field(..., pattern=r"^\d{1,2}$")
+    carrier_id: str = Field(..., pattern=r"^\d{1,4}$")
+    unit_id: str = Field(..., pattern=r"^\d{1,4}$")
+    decimal_places: str = Field(..., pattern=r"^[012]$")
+
+    @field_validator("region_code")
+    @classmethod
+    def format_region_code(cls, v):
+        return v.zfill(2)
+
+    @field_validator("carrier_id")
+    @classmethod
+    def format_carrier_id(cls, v):
+        return v.zfill(4)
+
+    @field_validator("unit_id")
+    @classmethod
+    def format_unit_id(cls, v):
+        return v.zfill(4)
+
+
+class EditProfileModel(BaseModel):
+    default_region_code: str = Field(..., pattern=r"^\d{1,2}$")
+    default_carrier_id: str = Field(..., pattern=r"^\d{1,4}$")
+    default_unit_id: str = Field(..., pattern=r"^\d{1,4}$")
+
+    @field_validator("default_region_code")
+    @classmethod
+    def format_region_code(cls, v):
+        return v.zfill(2)
+
+    @field_validator("default_carrier_id")
+    @classmethod
+    def format_carrier_id(cls, v):
+        return v.zfill(4)
+
+    @field_validator("default_unit_id")
+    @classmethod
+    def format_unit_id(cls, v):
+        return v.zfill(4)
