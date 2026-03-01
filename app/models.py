@@ -15,13 +15,13 @@ class User(UserMixin, db.Model):
     password_hash: so.Mapped[Optional[str]] = so.mapped_column(sa.String(256))
 
     # Поля для настроек файла конфигурации по умолчанию
-    default_region_code = db.Column(db.String(2), default='00')
-    default_carrier_id = db.Column(db.String(4), default='0000')
-    default_unit_id = db.Column(db.String(4), default='0000')
-  
+    default_region_code = db.Column(db.String(2), default="00")
+    default_carrier_id = db.Column(db.String(4), default="0000")
+    default_unit_id = db.Column(db.String(4), default="0000")
+
     def __repr__(self):
-        return '<User {}>'.format(self.username)
-  
+        return "<User {}>".format(self.username)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -37,28 +37,26 @@ def load_user(id):
 class Route(db.Model):
     id: so.Mapped[int] = so.mapped_column(primary_key=True)
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(User.id))
-    
+
     # СТАРЫЕ ПОЛЯ
     route_name: so.Mapped[str] = so.mapped_column(sa.String(128))
     transport_type: so.Mapped[str] = so.mapped_column(sa.String(4))
-    
+
     # НОВЫЕ ПОЛЯ ДЛЯ КОНФИГУРАЦИИ
     carrier_id: so.Mapped[str] = so.mapped_column(sa.String(10))
     unit_id: so.Mapped[str] = so.mapped_column(sa.String(10))
     route_number: so.Mapped[str] = so.mapped_column(sa.String(10))
     region_code: so.Mapped[str] = so.mapped_column(sa.String(5))
-    decimal_places: so.Mapped[str] = so.mapped_column(sa.String(1)) # 0, 1, 2, 3
-    
+    decimal_places: so.Mapped[str] = so.mapped_column(sa.String(1))  # 0, 1, 2, 3
+
     # JSON-поля
     tariff_tables = db.Column(db.JSON, default=list)
-    stops: so.Mapped[List] = so.mapped_column(JSON) 
+    stops: so.Mapped[List] = so.mapped_column(JSON)
     price_matrix: so.Mapped[List] = so.mapped_column(JSON)
 
     # Статус завершенности заполнения всех шагов
     stops_set: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=False)
     is_completed: so.Mapped[bool] = so.mapped_column(sa.Boolean, default=False)
 
-
     def __repr__(self):
-        return f'<Route {self.route_name}>'
-    
+        return f"<Route {self.route_name}>"
