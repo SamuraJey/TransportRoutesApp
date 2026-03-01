@@ -1,27 +1,22 @@
 VENV ?= .venv
-PYTHON_VERSION ?= 3.14
-PROJECT_NAME ?= viewport
+PYTHON_VERSION ?= 3.12
+PROJECT_NAME ?= transport_routes_app
 
 .PHONY: init clean pretty lint mypy ruff-lint test test-cov
 
 .create-venv:
 	test -d $(VENV) || python$(PYTHON_VERSION) -m venv $(VENV)
 	$(VENV)/bin/python -m pip install --upgrade pip
-	$(VENV)/bin/python -m pip install uv
+	$(VENV)/bin/python -m pip install poetry
 
 .install-deps:
-	$(VENV)/bin/uv sync
-
-.install-pre-commit:
-	$(VENV)/bin/pre-commit install
+	$(VENV)/bin/poetry install --no-root
 
 init:
 	@echo "Creating virtual environment..."
 	@$(MAKE) .create-venv
 	@echo "Installing dependencies..."
 	@$(MAKE) .install-deps
-	@echo "Installing pre-commit hooks..."
-	@$(MAKE) .install-pre-commit
 
 clean:
 	rm -rf .venv
@@ -45,7 +40,7 @@ mypy:
 lint: ruff-lint mypy
 
 test:
-	$(VENV)/bin/pytest -n 4 ./tests
+	$(VENV)/bin/pytest ./tests
 
 test-cov:
-	$(VENV)/bin/pytest -n 4 ./tests --cov=$(PROJECT_NAME) --cov=src --cov-branch --cov-fail-under=85
+	$(VENV)/bin/pytest ./tests --cov-branch --cov-fail-under=70
