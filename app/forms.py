@@ -6,10 +6,10 @@ from decimal import Decimal
 import sqlalchemy as sa
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from wtforms import BooleanField, DecimalField, FieldList, FormField, HiddenField, PasswordField, SelectField, StringField, SubmitField
-from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Regexp, ValidationError
+from wtforms.validators import DataRequired, InputRequired, Length, Regexp, ValidationError
 
 from app import db
 from app.constants import TRANSPORT_TYPE_CHOICES
@@ -47,9 +47,9 @@ class LoginForm(FlaskForm):
 
 class RegistrationForm(FlaskForm):
     username = StringField("Логин", validators=[DataRequired()])
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    email = StringField("Email", validators=[DataRequired()])
     password = PasswordField("Пароль", validators=[DataRequired()])
-    password2 = PasswordField("Повтор пароля", validators=[DataRequired(), EqualTo("password")])
+    password2 = PasswordField("Повтор пароля", validators=[DataRequired()])
     submit = SubmitField("Зарегистрироваться")
 
     def validate(self, extra_validators=None):
@@ -89,35 +89,21 @@ class RegistrationForm(FlaskForm):
 # --- Подформа для ввода одной Тарифной Таблицы (Строка Tabs) ---
 class TariffTableEntryForm(FlaskForm):
     # 1. Название тарифа (для Шага 3 и отображения)
-    tariff_name = StringField("Название тарифа", validators=[DataRequired(), Length(max=50)])
+    tariff_name = StringField("Название тарифа", validators=[DataRequired()])
 
     # 2. Тип таблицы (Стартовый код)
     # 02 для первой таблицы, P/T/F для остальных.
     # Мы используем StringField и Regexp для строгого контроля, поскольку это либо '02', либо 'P', 'T', 'F'.
     table_type_code = StringField(
         "Тип/Код Таблицы (02/P/T/F)",
-        validators=[
-            DataRequired(),
-            Length(min=1, max=2),
-            Regexp(
-                r"^(02|[PTF])$",
-                message='Допускается только "02" (для первой таблицы), "P", "T" или "F".',
-            ),
-        ],
+        validators=[DataRequired()],
     )
 
     # 3. Серии SS (список кодов)
     # Включает валидацию, что это список чисел, разделенных ';'.
     ss_series_codes = StringField(
         'Коды серий SS (через ";")',
-        validators=[
-            DataRequired(),
-            # ИСПРАВЛЕННОЕ РЕГУЛЯРНОЕ ВЫРАЖЕНИЕ
-            Regexp(
-                r"^(\d{2}|[A-Z])(;(\d{2}|[A-Z]))*$",
-                message='Введите коды серий SS без пробелов через ";". Каждая серия должна быть 2-значным числом (или буквенным кодом).',
-            ),
-        ],
+        validators=[DataRequired()],
     )
 
     def validate(self, extra_validators=None):
@@ -147,7 +133,7 @@ class StopForm(FlaskForm):
         # Это отключает CSRF именно для этой подформы
         csrf = False
 
-    stop_name = StringField("Название остановки", validators=[DataRequired(), Length(max=19)])
+    stop_name = StringField("Название остановки", validators=[DataRequired()])
     # Добавим расстояние, необходимое для генерации файла конфигурации
     # km_distance = DecimalField('Расстояние (км от начальной точки)', places=2, validators=[DataRequired()], default=0.00)
 
@@ -156,10 +142,7 @@ class StopForm(FlaskForm):
         "Расстояние до зоны (км)",
         places=2,
         # Используем InputRequired, чтобы разрешить значение 0
-        validators=[
-            InputRequired(),
-            NumberRange(min=0, message="Расстояние не может быть отрицательным."),
-        ],
+        validators=[InputRequired()],
     )
 
     def validate(self, extra_validators=None):
@@ -207,29 +190,17 @@ class StopForm(FlaskForm):
 class RouteInfoForm(FlaskForm):
     region_code = StringField(
         "Код региона (напр., 66)",
-        validators=[
-            DataRequired(),
-            Length(min=1, max=2),
-            Regexp(r"^\d+$", message="Код должен содержать только цифры (максимум 2)."),
-        ],
+        validators=[DataRequired()],
         filters=[lambda x: x.zfill(2) if x else x],
     )
     carrier_id = StringField(
         "ID Перевозчика (напр., 7012)",
-        validators=[
-            DataRequired(),
-            Length(min=1, max=4),
-            Regexp(r"^\d+$", message="ID должен содержать только цифры (максимум 4)."),
-        ],
+        validators=[DataRequired()],
         filters=[lambda x: x.zfill(4) if x else x],
     )  # Фильтр: заполнить строку нулями до длины 4
     unit_id = StringField(
         "ID Подразделения (напр., 0001)",
-        validators=[
-            DataRequired(),
-            Length(min=1, max=4),
-            Regexp(r"^\d+$", message="ID должен содержать только цифры (максимум 4)."),
-        ],
+        validators=[DataRequired()],
         filters=[lambda x: x.zfill(4) if x else x],
     )
     # Поле для точности цен после запятой (обычно 2)
@@ -239,15 +210,11 @@ class RouteInfoForm(FlaskForm):
         validators=[DataRequired()],
     )
 
-    route_name = StringField("Название маршрута", validators=[DataRequired(), Length(max=30)])
+    route_name = StringField("Название маршрута", validators=[DataRequired()])
 
     route_number = StringField(
         "Номер маршрута (напр., 854)",
-        validators=[
-            DataRequired(),
-            Length(min=1, max=6),
-            Regexp(r"^.+$", message="Номер должен состоять из максимум 6 символов."),
-        ],
+        validators=[DataRequired()],
         filters=[lambda x: x.zfill(6) if x else x],
     )
 
@@ -562,14 +529,13 @@ class LoginModel(BaseModel):
 
 class RegistrationModel(BaseModel):
     username: str = Field(..., min_length=1)
-    email: str = Field(..., min_length=1)
+    email: EmailStr = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
     password2: str = Field(..., min_length=1)
 
     @field_validator("email")
     @classmethod
     def validate_email_format(cls, v):
-        # Basic email validation - pydantic handles most of this
         if "@" not in v:
             raise ValueError("Некорректный email адрес")
         return v
@@ -600,8 +566,8 @@ class RegistrationModel(BaseModel):
 
 class TariffTableEntryModel(BaseModel):
     tariff_name: str = Field(..., min_length=1, max_length=50)
-    table_type_code: str = Field(..., pattern=r"^(02|[PTF])$")
-    ss_series_codes: str = Field(..., pattern=r"^(\d{2}|[A-Z])(;(\d{2}|[A-Z]))*$")
+    table_type_code: str = Field(..., min_length=1, max_length=2)
+    ss_series_codes: str = Field(..., min_length=1)
 
     @field_validator("table_type_code")
     @classmethod
@@ -624,7 +590,14 @@ class TariffTableEntryModel(BaseModel):
 
 class StopModel(BaseModel):
     stop_name: str = Field(..., min_length=1, max_length=19)
-    km_distance: Decimal = Field(..., ge=0, le=Decimal("99.99"))
+    km_distance: Decimal = Field(..., le=Decimal("99.99"))
+
+    @field_validator("km_distance")
+    @classmethod
+    def validate_km_distance_positive(cls, v: Decimal):
+        if v < 0:
+            raise ValueError("Расстояние не может быть отрицательным.")
+        return v
 
     @field_validator("km_distance")
     @classmethod

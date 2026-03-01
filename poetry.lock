@@ -1509,6 +1509,7 @@ files = [
 
 [package.dependencies]
 annotated-types = ">=0.6.0"
+email-validator = {version = ">=2.0.0", optional = true, markers = "extra == \"email\""}
 pydantic-core = "2.41.5"
 typing-extensions = ">=4.14.1"
 typing-inspection = ">=0.4.2"
@@ -2410,4 +2411,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <4.0"
-content-hash = "0388ac6b22be578877cbc95f1aeeccf6dd3ae172c62182adcf27b5f30eda2b52"
+content-hash = "251231e07ba98e5caf58177fecfc09c9f30e554368780f32a1c4c2773a531ca8"

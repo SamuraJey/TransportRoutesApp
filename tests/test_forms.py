@@ -66,7 +66,7 @@ class TestRegistrationForm:
                 password2="different",
             )
             assert form.validate() is False
-            assert "Field must be equal to password" in str(form.password2.errors)
+            assert "Пароли не совпадают" in str(form.password2.errors)
 
 
 class TestTariffTableEntryForm:
