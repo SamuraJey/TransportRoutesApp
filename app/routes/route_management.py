@@ -197,7 +197,7 @@ def edit_route_stops(route_id):
         # Важный момент: WTForms сам разберет request.form,
         # если названия полей в JS (stops-N-...) совпадают с ожиданиями FieldList
         form = RouteStopsForm(request.form, route=route)
-        # print(f"DEBUG: Полученные ключи формы: {list(request.form.keys())}")
+        print(f"DEBUG: Полученные ключи формы: {list(request.form.keys())}")
     else:
         # Для GET создаем форму и наполняем её данными из БД
         form = RouteStopsForm(route=route)
@@ -212,10 +212,11 @@ def edit_route_stops(route_id):
 
     # print(f"DEBUG: CSRF в форме: {form.csrf_token.data}")
     # print(f"DEBUG: CSRF в запросе: {request.form.get('csrf_token')}")
-    # print(f"DEBUG: Ошибки формы до валидации: {form.errors}")
+    print(f"DEBUG: Ошибки формы до валидации: {form.errors}")
 
     # 1. ОБРАБОТКА POST-ЗАПРОСА
     if form.validate_on_submit():
+        print("защли")
         # Проверяем, что нажата кнопка "Далее"
         # if form.next_step.data:
         new_stop_data = []
@@ -244,6 +245,7 @@ def edit_route_stops(route_id):
 
     # 2. ЕСЛИ ВАЛИДАЦИЯ НЕ ПРОШЛА (POST)
     elif request.method == "POST":
+        print("УДША")
         # Собираем ошибки из всех уровней формы
         for field, errors in form.errors.items():
             if isinstance(errors, list):
@@ -253,6 +255,8 @@ def edit_route_stops(route_id):
             elif isinstance(errors, dict):
                 # Ошибки внутри FieldList (по индексам)
                 flash("Проверьте правильность заполнения полей остановок.", "danger")
+        else:
+            flash("Проверьте правильность заполнения формы.", "danger")
 
     return render_template(
         "route_stops_form.html",
@@ -265,26 +269,24 @@ def edit_route_stops(route_id):
     # или если были другие submit-кнопки.
     # Fallthrough to render_template below for validation errors.
 
-    # # 3. ОБРАБОТКА GET-ЗАПРОСА (инициализация данных)
-    # if request.method == 'GET' and route.stops:
-    #     # Очищаем FieldList перед заполнением, чтобы избежать дублирования
-    #     form.stops.entries = []
-    #     for stop_data in route.stops:
-    #         # Преобразуем строку 'km' из БД обратно в float для формы
-    #         try:
-    #             km_for_form = float(stop_data['km'])
-    #         except (TypeError, ValueError):
-    #             # Если по какой-то причине значение некорректно, ставим 0.0
-    #             km_for_form = 0.0
+    # 3. ОБРАБОТКА GET-ЗАПРОСА (инициализация данных)
+    if request.method == "GET" and route.stops:
+        # Очищаем FieldList перед заполнением, чтобы избежать дублирования
+        form.stops.entries = []
+        for stop_data in route.stops:
+            # Преобразуем строку 'km' из БД обратно в float для формы
+            try:
+                km_for_form = float(stop_data["km"])
+            except (TypeError, ValueError):
+                # Если по какой-то причине значение некорректно, ставим 0.0
+                km_for_form = 0.0
 
-    #         # При инициализации формы km_distance лучше передавать как str или float,
-    #         # если он был сохранен как float, но DecimalField справится с float.
-    #         form.stops.append_entry(
-    #             {'stop_name': stop_data['name'], 'km_distance': km_for_form}
-    #         )
+            # При инициализации формы km_distance лучше передавать как str или float,
+            # если он был сохранен как float, но DecimalField справится с float.
+            form.stops.append_entry({"stop_name": stop_data["name"], "km_distance": km_for_form})
 
     # 3. РЕНДЕРИНГ ШАБЛОНА
-    # return render_template('route_stops_form.html', form=form, route=route, title='Редактирование остановок: Шаг 2')
+    return render_template("route_stops_form.html", form=form, route=route, title="Редактирование остановок: Шаг 2")
 
 
 # --- Форма с ценами за каждый отрезок пути (Этап 3) ---

@@ -219,7 +219,7 @@ class TestRouteInfoForm:
 class TestRouteStopsForm:
     def test_route_stops_form_valid_city_route(self, app):
         with app.app_context():
-            # Mock route object
+            # City route should accept exactly one stop.
             class MockRoute:
                 transport_type = "0x02"
 
@@ -229,6 +229,25 @@ class TestRouteStopsForm:
                 [
                     ("stops-0-stop_name", "Stop 1"),
                     ("stops-0-km_distance", "0.00"),
+                ]
+            )
+            form = RouteStopsForm(formdata=formdata, route=MockRoute())
+            assert form.validate() is True
+
+    def test_route_stops_form_valid_intercity_route(self, app):
+        with app.app_context():
+            # Non-city route (e.g. 0x40) should allow multiple stops.
+            class MockRoute:
+                transport_type = "0x40"
+
+            from werkzeug.datastructures import ImmutableMultiDict
+
+            formdata = ImmutableMultiDict(
+                [
+                    ("stops-0-stop_name", "Stop 1"),
+                    ("stops-0-km_distance", "0.00"),
+                    ("stops-1-stop_name", "Stop 2"),
+                    ("stops-1-km_distance", "10.00"),
                 ]
             )
             form = RouteStopsForm(formdata=formdata, route=MockRoute())

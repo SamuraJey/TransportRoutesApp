@@ -338,6 +338,7 @@ class RouteStopsForm(FlaskForm):
 
         except PydanticValidationError as e:
             # Map Pydantic errors back to WTForms
+            print("Pydantic validation errors:", e.errors())  # Debug print
             for error in e.errors():
                 field_path = error["loc"]
                 if len(field_path) >= 2 and field_path[0] == "stops":
@@ -681,8 +682,14 @@ class RouteInfoModel(BaseModel):
 
 
 class RouteStopsModel(BaseModel):
-    stops: list[StopModel] = Field(..., min_length=1)
+    # transport_type must come before stops so that the validator for stops
+    # can read the correct value from info.data. If transport_type is declared
+    # after stops, info.data in the field_validator may not yet include it and
+    # the default of "0x02" (city) will be used, causing every route to be
+    # treated as city during validation. We originally observed this bug when
+    # intercity routes (0x40) were incorrectly rejected as "городской".
     transport_type: str  # Need this for validation
+    stops: list[StopModel] = Field(..., min_length=1)
 
     @field_validator("stops")
     @classmethod
